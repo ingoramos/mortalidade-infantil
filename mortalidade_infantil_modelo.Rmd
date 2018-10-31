@@ -1,0 +1,599 @@
+---
+title: "mort_infantil_modelo"
+output: html_document
+---
+
+```{r}
+#Opções gerais
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	echo = T,
+  options(scipen=100),
+  options(digits=2)
+)
+options("scipen"=100, "digits"=4)#usar notação decimal
+knitr::opts_chunk$set(cache=TRUE)#otimizar a utilização de memória cache
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+#Importação das bibliotescas
+library(readr)
+library(plyr)
+library(chron)#transformar caracter em hora
+library(tidyverse)
+library(reshape)
+library(forcats)#ordenar barras no ggplot
+library(gridExtra)#arrumar multiplos gráficos em uma figura
+library(knitr)
+library(kableExtra)#Fazer tabela do summary
+library(pander)#Fazer tabela do chi.test
+library(caret)#K-fold cross validation
+library(caTools)#Calcular AUC
+library(ROSE) #dealing with imbalanced data
+library(plotly) #gráficos interativos
+library(doParallel) #Parallel Processing
+library(mice) #Input de valores para substituir NA
+library(tibble) #tabelas
+library(fastAdaboost) #AdaBoost Classification Trees
+library(gbm) #Stochastic Gradient Boosting
+library(binda) #modelo Binary Discriminant Analysis
+library(nnet) #Bayesian Regularized Neural Networks
+library(xgboost) #eXtreme Gradient Boosting
+library(deepnet) #Stacked AutoEncoder Deep Neural Network
+library(MASS) #Generalized Linear Model with Stepwise Feature Selection
+library(LiblineaR) #SVM
+library(ggplot2) #plots
+library(corrgram) #correlograma
+library(data.table) #otimização do uso de dataframes
+```
+
+
+```{r}
+apply(sinasc,2,pMiss)
+apply(mort_infantil_18,2,pMiss)
+
+```
+
+
+```{r}
+mort_infantil <- read.csv(file = "mort_infantil.csv")
+
+dicionario <- read.csv(file = "Dicionário Artigo 1 v0.06 Binário.csv", sep = ";")
+
+pMiss <- function(x){sum(is.na(x))/length(x)*100} # função para encontrar NA's
+```
+
+
+```{r}
+#lista com os nomes da variáveis para selecionar do banco 
+lista_variaveis <- c("GESTACAO_SINASC", "PARTO_SINASC", "APGAR1_SINASC", "APGAR5_SINASC", "PESO_SINASC", "IDANOMAL_SINASC", "QTDPARTNOR_SINASC", "IDADEMAE_SINASC", "GRAVIDEZ_SINASC", "CONSULTAS_SINASC", "ESCMAE2010_SINASC", "OBITO")
+
+sinasc <- mort_infantil[, which(names(mort_infantil) %in% lista_variaveis)]
+
+apply(sinasc,2,pMiss) #aplica a função de NA
+```
+
+
+```{r}
+#completa os dados com o pacote mice
+tempData <- mice(sinasc,m=5,maxit=50,meth='cart',seed=500)
+sinasc <- complete(tempData,1)
+
+apply(sinasc,2,pMiss) #aplica a função de NA
+```
+
+
+```{r}
+#dados de 2018
+mort_infantil_18 <- read.csv(file = "mort_infantil_2018.csv")
+mort_infantil_18 <- mort_infantil_18[, which(names(mort_infantil_18) %in% lista_variaveis)]
+
+apply(mort_infantil_18,2,pMiss) #aplica a função de NA
+
+#completa os dados com o pacote mice
+tempData2 <- mice(mort_infantil_18,m=5,maxit=50,meth='cart',seed=500)
+mort_infantil_18 <- complete(tempData2,1)
+
+
+```
+
+
+```{r}
+#existem alguns dados que foram preenchidos fora do padrão, e são transformados para NA
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$APGAR5_SINASC[i] > 10){mort_infantil_18$APGAR5_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$GESTACAO_SINASC[i] > 9){mort_infantil_18$GESTACAO_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$PARTO_SINASC[i] > 2){mort_infantil_18$PARTO_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$APGAR1_SINASC[i] > 10){mort_infantil_18$APGAR1_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$IDANOMAL_SINASC[i] != 1 & mort_infantil_18$IDANOMAL_SINASC[i] != 2 & mort_infantil_18$IDANOMAL_SINASC[i] != 9){mort_infantil_18$IDANOMAL_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$ESCMAE2010_SINASC[i] > 9){mort_infantil_18$ESCMAE2010_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$ESTCIVMAE_SINASC[i] > 9){mort_infantil_18$ESTCIVMAE_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$GRAVIDEZ_SINASC[i] > 3){mort_infantil_18$GRAVIDEZ_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$CONSULTAS_SINASC[i] > 9){mort_infantil_18$CONSULTAS_SINASC[i] <- NA}
+}
+
+for(i in 1:nrow(mort_infantil_18)){
+  if(mort_infantil_18$STTRABPART_SINASC[i] > 9){mort_infantil_18$STTRABPART_SINASC[i] <- NA}
+}
+
+#Usando o pacote mice novamente para completar os dados
+tempData3 <- mice(mort_infantil_18,m=5,maxit=50,meth='cart',seed=500)
+mort_infantil_18 <- complete(tempData3,1)
+
+```
+
+
+```{r}
+lista_variaveis <- c("GESTACAO_SINASC", "PARTO_SINASC", "APGAR1_SINASC", "APGAR5_SINASC", "PESO_SINASC", "IDANOMAL_SINASC", "QTDPARTNOR_SINASC", "IDADEMAE_SINASC", "GRAVIDEZ_SINASC", "CONSULTAS_SINASC", "ESCMAE2010_SINASC", "OBITO")
+
+sinasc <- sinasc[, which(names(sinasc) %in% lista_variaveis)]
+mort_infantil_18 <- mort_infantil_18[, which(names(mort_infantil_18) %in% lista_variaveis)]
+
+#Transformando as variáveis em fator e o OBITO em "sim" ou "nao"
+sinasc$OBITO <- as.character(sinasc$OBITO)
+sinasc$OBITO <- ifelse(sinasc$OBITO=="0", sinasc$OBITO <-'nao', sinasc$OBITO<-'sim')
+sinasc$OBITO <- as.factor(sinasc$OBITO)
+
+sinasc$GESTACAO_SINASC <- as.factor(sinasc$GESTACAO_SINASC)
+sinasc$PARTO_SINASC <- as.factor(sinasc$PARTO_SINASC)
+sinasc$APGAR1_SINASC <- as.factor(sinasc$APGAR1_SINASC)
+sinasc$APGAR5_SINASC <- as.factor(sinasc$APGAR5_SINASC)
+sinasc$IDANOMAL_SINASC <- as.factor(sinasc$IDANOMAL_SINASC)
+sinasc$ESCMAE2010_SINASC <- as.factor(sinasc$ESCMAE2010_SINASC)
+sinasc$GRAVIDEZ_SINASC <- as.factor(sinasc$GRAVIDEZ_SINASC)
+sinasc$CONSULTAS_SINASC <- as.factor(sinasc$CONSULTAS_SINASC)
+
+
+mort_infantil_18$OBITO <- as.character(mort_infantil_18$OBITO)
+mort_infantil_18$OBITO <- ifelse(mort_infantil_18$OBITO=="0", mort_infantil_18$OBITO <-'nao', mort_infantil_18$OBITO<-'sim')
+mort_infantil_18$OBITO <- as.factor(mort_infantil_18$OBITO)
+
+mort_infantil_18$GESTACAO_SINASC <- as.factor(mort_infantil_18$GESTACAO_SINASC)
+mort_infantil_18$PARTO_SINASC <- as.factor(mort_infantil_18$PARTO_SINASC)
+mort_infantil_18$APGAR1_SINASC <- as.factor(mort_infantil_18$APGAR1_SINASC)
+mort_infantil_18$APGAR5_SINASC <- as.factor(mort_infantil_18$APGAR5_SINASC)
+mort_infantil_18$IDANOMAL_SINASC <- as.factor(mort_infantil_18$IDANOMAL_SINASC)
+mort_infantil_18$ESCMAE2010_SINASC <- as.factor(mort_infantil_18$ESCMAE2010_SINASC)
+mort_infantil_18$GRAVIDEZ_SINASC <- as.factor(mort_infantil_18$GRAVIDEZ_SINASC)
+mort_infantil_18$CONSULTAS_SINASC <- as.factor(mort_infantil_18$CONSULTAS_SINASC)
+```
+
+
+```{r}
+
+levels(sinasc$OBITO) <- list(sim = "sim", nao = "nao")
+levels(mort_infantil_18$OBITO) <- list(sim = "sim", nao = "nao")
+
+mort_infantil_18_test <- mort_infantil_18[, -which(names(mort_infantil_18) %in% c("OBITO"))]
+```
+
+#Dados
+```{r}
+#dados de treino 2014 até 2017
+write.csv(sinasc, file = "sinasc_treino.csv")
+#dados de teste 2018, com a variável OBITO
+write.csv(mort_infantil_18, file = "mort_infantil_18.csv")
+#dados de teste 2018, sem a variável OBITO
+write.csv(mort_infantil_18_test, file = "mort_infantil_18_test.csv")
+```
+
+
+#Predição
+```{r}
+myControl <- trainControl(
+  method = "repeatedcv", 
+  number = 2, #number é o número de folds
+  #repeats = 0, #repeats é o número de repetições para cada fold
+  summaryFunction = twoClassSummary,
+  classProbs = TRUE, # IMPORTANT!
+  verboseIter = FALSE,
+  savePredictions = TRUE,
+  returnResamp = "all",
+  sampling = "down", #balanceamento dos dados
+  allowParallel = TRUE
+)
+
+# "glm", "ranger", "knn", "gbm", "nnet", "adaboost", "xgbTree", "dnn"
+modelos = c("glm", "ranger", "knn", "gbm", "nnet", "adaboost", "xgbTree", "dnn")
+
+
+# Fit model
+model <- train(
+OBITO ~ . , #variável 
+data = sinasc, #banco de treino
+preProcess = c("center", "scale"),
+metric = "Sens", # métrica para comparação dos modelos
+method = "ranger",
+trControl = myControl #aplica o myControl
+
+)
+
+#fazendo a matriz de confusão para o banco de treino    
+banco_model <- model$trainingData
+
+banco_model$.outcome <- as.factor(banco_model$.outcome)
+
+cm_t <- confusionMatrix(banco_model$.outcome, sample(banco_model$.outcome))
+cm_t
+
+# Print model to console
+model
+
+# Print maximum ROC statistic
+r <- max(model[["results"]][["Sens"]])
+r
+
+#predição que retorna os valor em probabilidade, usando o type = "prob"
+predictions <- predict(model, mort_infantil_18_test, type = "prob")
+
+#predição que retorna a matriz de confusão
+predcm <- predict(model, mort_infantil_18_test)
+#matriz de confusão com os valores reais e os preditos
+cm <- confusionMatrix(predcm, mort_infantil_18$OBITO)
+cm
+
+predcm <- predcm %>% as.data.frame()
+
+#transforma a predição em uma coluna
+a <- predcm %>% as.data.frame()
+names(a) <- "PREDICOES"
+
+#colando a coluna da predição para comparar com a real
+resultados <- cbind(mort_infantil_18, predictions, a)
+
+#cria uma coluna com a probabilidade em % de OBITO
+resultados["Prob"] <- resultados$sim * 100
+resultados <- resultados %>% as.data.frame()
+
+```
+
+
+
+
+
+
+
+
+
+
+#Função processamento
+```{r}
+processamento <- function(bancoTreino, bancoPred){
+  
+  #inputs dos bancos de dados de treino e teste
+  treino <- bancoTreino
+  teste_ctrl <- bancoPred
+  
+  #lista com os nomes da variáveis para selecionar do banco 
+  lista_variaveis <- c("GESTACAO_SINASC", "PARTO_SINASC", "APGAR1_SINASC", "APGAR5_SINASC", "PESO_SINASC", "IDANOMAL_SINASC", "QTDPARTNOR_SINASC", "IDADEMAE_SINASC", "GRAVIDEZ_SINASC", "CONSULTAS_SINASC", "ESCMAE2010_SINASC", "OBITO")
+
+  
+  #selecionando as variáveis pela lista do banco treino de treino
+  treino <- treino[, which(names(treino) %in% lista_variaveis)]
+
+  #usando o pacote mice para completar os dados NA do banco
+  tempData <- mice(treino,m=5,maxit=50,meth='cart',seed=500)
+  treino <- complete(tempData,1)
+
+  #transformando a variável OBITO em "sim/nao" e em fator
+  treino$OBITO <- as.character(treino$OBITO)
+  treino$OBITO <- ifelse(treino$OBITO=="0", treino$OBITO <-'nao', treino$OBITO<-'sim')
+  treino$OBITO <- as.factor(treino$OBITO)
+  
+  #transformando outras variáveis em fator, as variáveis PESO e QTDPARTNOR continuam como numéricas
+  treino$GESTACAO_SINASC <- as.factor(treino$GESTACAO_SINASC)
+  treino$PARTO_SINASC <- as.factor(treino$PARTO_SINASC)
+  treino$APGAR1_SINASC <- as.factor(treino$APGAR1_SINASC)
+  treino$APGAR5_SINASC <- as.factor(treino$APGAR5_SINASC)
+  treino$IDANOMAL_SINASC <- as.factor(treino$IDANOMAL_SINASC)
+  treino$ESCMAE2010_SINASC <- as.factor(treino$ESCMAE2010_SINASC)
+  treino$GRAVIDEZ_SINASC <- as.factor(treino$GRAVIDEZ_SINASC)
+  treino$CONSULTAS_SINASC <- as.factor(treino$CONSULTAS_SINASC)
+  
+  #selecionando as variáveis do banco de teste pelo banco de treino
+  teste <- teste[, which(names(teste) %in% names(lista_variaveis))]
+
+  #usando o pacote mice para completar os dados NA do banco de teste
+  tempData2 <- mice(teste,m=5,maxit=50,meth='cart',seed=500)
+  teste <- complete(tempData2,1)
+
+  #existem alguns dados que foram preenchidos fora do padrão, e são transformados para NA
+  for(i in 1:nrow(teste)){
+    if(teste$APGAR5_SINASC[i] > 10){teste$APGAR5_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$GESTACAO_SINASC[i] > 9){teste$GESTACAO_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$PARTO_SINASC[i] > 2){teste$PARTO_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$APGAR1_SINASC[i] > 10){teste$APGAR1_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$IDANOMAL_SINASC[i] != 1 & teste$IDANOMAL_SINASC[i] != 2 & teste$IDANOMAL_SINASC[i] != 9){teste$IDANOMAL_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$ESCMAE2010_SINASC[i] > 9){teste$ESCMAE2010_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$ESTCIVMAE_SINASC[i] > 9){teste$ESTCIVMAE_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$GRAVIDEZ_SINASC[i] > 3){teste$GRAVIDEZ_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$CONSULTAS_SINASC[i] > 9){teste$CONSULTAS_SINASC[i] <- NA}
+  }
+  
+  for(i in 1:nrow(teste)){
+    if(teste$STTRABPART_SINASC[i] > 9){teste$STTRABPART_SINASC[i] <- NA}
+  }
+  
+  #Usando o pacote mice novamente para completar os dados
+  tempData3 <- mice(teste,m=5,maxit=50,meth='cart',seed=500)
+  teste <- complete(tempData3,1)
+  
+  
+  #transformando outras variáveis em fator, as variáveis PESO e QTDPARTNOR continuam como numéricas
+  teste$OBITO <- as.character(teste$OBITO)
+  teste$OBITO <- ifelse(teste$OBITO=="0", teste$OBITO <-'nao', teste$OBITO<-'sim')
+  teste$OBITO <- as.factor(teste$OBITO)
+  
+  teste$GESTACAO_SINASC <- as.factor(teste$GESTACAO_SINASC)
+  teste$PARTO_SINASC <- as.factor(teste$PARTO_SINASC)
+  teste$APGAR1_SINASC <- as.factor(teste$APGAR1_SINASC)
+  teste$APGAR5_SINASC <- as.factor(teste$APGAR5_SINASC)
+  teste$IDANOMAL_SINASC <- as.factor(teste$IDANOMAL_SINASC)
+  teste$ESCMAE2010_SINASC <- as.factor(teste$ESCMAE2010_SINASC)
+  teste$GRAVIDEZ_SINASC <- as.factor(teste$GRAVIDEZ_SINASC)
+  teste$CONSULTAS_SINASC <- as.factor(teste$CONSULTAS_SINASC)
+  
+  
+  levels(treino$OBITO) <- list(sim = "sim", nao = "nao")
+  levels(teste$OBITO) <- list(sim = "sim", nao = "nao")
+
+  # chamar a função do treino e predição dentro dessa função
+  modelo <- pred_mort(treino, teste)
+}
+```
+
+
+```{r}
+processamento(mort_infantil, mort_infantil_18)
+```
+
+```{r}
+sinasc <- backup2
+mort_infantil_18 <- backup3
+```
+
+#Função
+```{r}
+pred_mort <- function(bancoTreino, bancoPred){
+  
+  set.seed(2)
+  
+  # dados para treino
+  train_data <- bancoTreino
+  
+  # dados para controle do teste
+  test_ctrl <- bancoPred
+  
+  # dados para o teste
+  test <- test_ctrl[, -which(names(test_ctrl) %in% c("OBITO"))]
+
+  #lista com os métodos de balanceamento
+  sampling_methods <- c("down", "up", "smote")
+  j <- 1
+  sm_index <- 1
+  
+  for(j in length(sampling_methods)){
+    
+    sm_index <- sm_index + 1
+    j <- j + 1
+    
+    #Create train/test index
+    # Create trainControl object: myControl - Deve ser utilizado em todos os modelos para que sejam comparáveis
+    myControl <- trainControl(
+      method = "cv", #"repeatedcv" é o método para realizar as repetições
+      number = 2, #number é o número de folds
+      #repeats = 1, #repeats é o número de repetições para cada fold
+      summaryFunction = twoClassSummary,
+      classProbs = TRUE, # IMPORTANT!
+      verboseIter = FALSE,
+      savePredictions = TRUE,
+      returnResamp = "all",
+      sampling = sampling_methods[sm_index], #balanceamento dos dados
+      allowParallel = TRUE
+    )
+    
+      #lista de modelos que serão usados inicialmente 
+      # "glm" = Generalized Linear Model, "ranger" = Random Forest, "knn" = k-Nearest Neighbors, 
+      #"nnet" = Neural Network, "dnn" = Stacked AutoEncoder Deep Neural Network, 
+      #"xgbTree" = eXtreme Gradient Boosting, "gbm" = Stochastic Gradient Boosting, "adaboost" = AdaBoost Classification Trees.
+      
+      # "glm", "ranger", "knn", "gbm", "nnet", "adaboost", "xgbTree", "dnn"
+      modelos <- c("knn")
+      
+      i <- 1 #indice para atualizar o while
+      index <- 1 #indice que retorna o modelo da lista
+      maior_valor <- 0 #usado para verificar qual o modelo com maior valor preditivo negativo.
+      #espec <- 0 #usado para verificar qual o modelo com maior especificidade.
+      
+      #lista com os métodos de balanceamento
+      metrics <- c("ROC", "Sens")
+      k <- 1
+      m_index <- 1
+      
+      for(k in length(metrics)){
+        
+        m_index <- m_index + 1
+        k <- k + 1
+      
+        #loop para selecionar o melhor algoritmo
+        while(i <= length((modelos))) {
+          
+          # Fit model
+          model <- train(
+          OBITO ~ . , #variável preditiva
+          data = train_data, #banco de treino
+          preProcess = c("center", "scale"),
+          metric = metrics[m_index], # métrica para comparação dos modelos
+          method = modelos[index], #lista com indice (retorna uma string com o nome do método para cada modelo)
+          trControl = myControl #aplica o controle
+          
+          )
+          
+          #fazendo a matriz de confusão para o banco de treino    
+          banco_model <- model$trainingData
+      
+          banco_model$.outcome <- as.factor(banco_model$.outcome)
+      
+          cm_t <- confusionMatrix(banco_model$.outcome, sample(banco_model$.outcome))
+          
+      
+          # Print model to console
+          model
+          
+          # Print maximum ROC statistic
+          max(model[["results"]][["ROC"]])
+          
+          #predição dos modelos no banco para matriz de confusão
+          predictionsCM <- predict(model, test)
+          
+          #predição dos modelos no banco para probabilidade
+          predictions <- predict(model, test, type = "prob")
+          
+          #o test_control é usado para comparação com os valores da predição, gerando a matriz de confusão.
+          cm <- confusionMatrix(predictionsCM, test_ctrl$OBITO)
+          
+          #extraindo os resultados da matriz de confusão
+          cm_results <- cm$byClass %>% as.list()
+          
+          #extraindo a sensibilidade
+          sens <- cm_results[1] %>% as.data.frame()
+          sens <- sens$Sensitivity
+          
+          
+          #verificação do maior valor preditivo negativo, como inicialmente o maior valor está atribuído como 0, o primeiro modelo sempre terá o maior valor, ou seja, sempre que um modelo conseguir alcançar um valor preditivo negativo maior que o armazenado na memória, este passa a ser o instrumento de verificação.
+          if(sens > maior_valor){
+            maior_valor <- sens #valor preditivo positivo passa a ser o maior valor
+            resultado <- paste("O melhor modelo foi: ", modelos[index], ", usando o método de balanceamento: ", sampling_methods[sm_index], "com a métrica: ", metrics[m_index], ", com sensibilidade de: ", sens) #mensagem para informar o modelo com melhor resultado
+            cm_melhor <- cm #cm armazena os dados da matriz de confusão (teste) do melhor modelo
+            cm_t_melhor <- cm_t #cm_t armazena os dados da matriz de confusão (treino) do melhor modelo
+            melhor_modelo <- model
+            
+            #colando a coluna da predição para comparar com a real
+            resultados <- cbind(test_ctrl, predictions)
+            
+            #cria uma coluna com a probabilidade em % de OBITO
+            resultados["Prob"] <- resultados$sim * 100
+            
+            modelo <- modelos[index]
+            samp <- sampling_methods[sm_index]
+            metrica <- metrics[m_index]
+            
+          }
+          else{
+            maior_valor <- maior_valor #caso a verificação falhe, o maior_valor continua sendo ele mesmo ("atual")
+          }
+          
+          #atualiza o indice para o i (while), e index (lista de modelos)
+          i <- i + 1
+          index <- index + 1
+          
+        }
+      }
+  }
+    #desenha a matriz de confusão para o cm armazenado com o melhor modelo
+   # cm_p <- draw_confusion_matrix(cm_melhor)  
+  
+  #retorno da função (matriz de confusão de treino (cm_t), mensagem de resultado (resultado), desenho da matriz de confusão de teste (cm_p))
+  return(melhor_modelo)
+  
+}
+
+```
+
+
+```{r}
+modelo <- pred_mort(sinasc, mort_infantil_18)
+```
+
+
+```{r}
+pred <- function(model, teste){
+
+  model <- model
+  test <- teste
+  
+  #predição dos modelos no banco para probabilidade
+  predictions <- predict(model, test, type = "prob")
+  
+  #colando a coluna da predição para comparar com a real
+  resultados <- cbind(test, predictions)
+  
+  #cria uma coluna com a probabilidade em % de OBITO
+  resultados["Prob"] <- resultados$sim * 100  
+  
+  prob <- resultados$Prob
+  resultados$Prob <- as.numeric(resultados$Prob)
+  
+  for(i in 1:nrow(resultados)){
+    if(resultados$Prob[i] <= 100 | resultados$Prob[i] >= 50){
+      resultado <- paste("Criança com alta probabilidade de óbito")
+    }
+    else if(resultados$Prob[i] < 50 | resultados$Prob[i] >= 30){
+      resultado <- paste("Criança com média probabilidade de óbito")
+    }
+    else{
+      resultado <- paste("Criança com baixa probabilidade de óbito")
+    }
+  }
+  
+  return(resultado)
+}
+
+pred(modelo, mort_infantil_18_test)
+
+```
+
+
+
+

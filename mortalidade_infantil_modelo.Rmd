@@ -51,6 +51,36 @@ library(data.table) #otimização do uso de dataframes
 ```
 
 
+#lendo bases de treino e teste
+```{r}
+sinasc <- read.csv(file = "sinasc_treino.csv")
+sinasc <- sinasc[, -1]
+mort_infantil_18 <- read.csv(file = "mort_infantil_18.csv")
+mort_infantil_18 <- mort_infantil_18[, -1]
+
+
+sinasc$GESTACAO_SINASC <- as.factor(sinasc$GESTACAO_SINASC)
+sinasc$PARTO_SINASC <- as.factor(sinasc$PARTO_SINASC)
+sinasc$APGAR1_SINASC <- as.factor(sinasc$APGAR1_SINASC)
+sinasc$APGAR5_SINASC <- as.factor(sinasc$APGAR5_SINASC)
+sinasc$IDANOMAL_SINASC <- as.factor(sinasc$IDANOMAL_SINASC)
+sinasc$ESCMAE2010_SINASC <- as.factor(sinasc$ESCMAE2010_SINASC)
+sinasc$GRAVIDEZ_SINASC <- as.factor(sinasc$GRAVIDEZ_SINASC)
+sinasc$CONSULTAS_SINASC <- as.factor(sinasc$CONSULTAS_SINASC)
+
+
+mort_infantil_18$GESTACAO_SINASC <- as.factor(mort_infantil_18$GESTACAO_SINASC)
+mort_infantil_18$PARTO_SINASC <- as.factor(mort_infantil_18$PARTO_SINASC)
+mort_infantil_18$APGAR1_SINASC <- as.factor(mort_infantil_18$APGAR1_SINASC)
+mort_infantil_18$APGAR5_SINASC <- as.factor(mort_infantil_18$APGAR5_SINASC)
+mort_infantil_18$IDANOMAL_SINASC <- as.factor(mort_infantil_18$IDANOMAL_SINASC)
+mort_infantil_18$ESCMAE2010_SINASC <- as.factor(mort_infantil_18$ESCMAE2010_SINASC)
+mort_infantil_18$GRAVIDEZ_SINASC <- as.factor(mort_infantil_18$GRAVIDEZ_SINASC)
+mort_infantil_18$CONSULTAS_SINASC <- as.factor(mort_infantil_18$CONSULTAS_SINASC)
+
+```
+
+
 ```{r}
 apply(sinasc,2,pMiss)
 apply(mort_infantil_18,2,pMiss)
@@ -151,6 +181,7 @@ mort_infantil_18 <- complete(tempData3,1)
 
 
 ```{r}
+'
 lista_variaveis <- c("GESTACAO_SINASC", "PARTO_SINASC", "APGAR1_SINASC", "APGAR5_SINASC", "PESO_SINASC", "IDANOMAL_SINASC", "QTDPARTNOR_SINASC", "IDADEMAE_SINASC", "GRAVIDEZ_SINASC", "CONSULTAS_SINASC", "ESCMAE2010_SINASC", "OBITO")
 
 sinasc <- sinasc[, which(names(sinasc) %in% lista_variaveis)]
@@ -158,9 +189,9 @@ mort_infantil_18 <- mort_infantil_18[, which(names(mort_infantil_18) %in% lista_
 
 #Transformando as variáveis em fator e o OBITO em "sim" ou "nao"
 sinasc$OBITO <- as.character(sinasc$OBITO)
-sinasc$OBITO <- ifelse(sinasc$OBITO=="0", sinasc$OBITO <-'nao', sinasc$OBITO<-'sim')
+sinasc$OBITO <- ifelse(sinasc$OBITO=="0", sinasc$OBITO <-"nao", sinasc$OBITO<-"sim")
 sinasc$OBITO <- as.factor(sinasc$OBITO)
-
+'
 sinasc$GESTACAO_SINASC <- as.factor(sinasc$GESTACAO_SINASC)
 sinasc$PARTO_SINASC <- as.factor(sinasc$PARTO_SINASC)
 sinasc$APGAR1_SINASC <- as.factor(sinasc$APGAR1_SINASC)
@@ -170,11 +201,11 @@ sinasc$ESCMAE2010_SINASC <- as.factor(sinasc$ESCMAE2010_SINASC)
 sinasc$GRAVIDEZ_SINASC <- as.factor(sinasc$GRAVIDEZ_SINASC)
 sinasc$CONSULTAS_SINASC <- as.factor(sinasc$CONSULTAS_SINASC)
 
-
+'
 mort_infantil_18$OBITO <- as.character(mort_infantil_18$OBITO)
-mort_infantil_18$OBITO <- ifelse(mort_infantil_18$OBITO=="0", mort_infantil_18$OBITO <-'nao', mort_infantil_18$OBITO<-'sim')
+#mort_infantil_18$OBITO <- ifelse(mort_infantil_18$OBITO=="0", mort_infantil_18$OBITO <-"nao", mort_infantil_18$OBITO<-"sim")
 mort_infantil_18$OBITO <- as.factor(mort_infantil_18$OBITO)
-
+'
 mort_infantil_18$GESTACAO_SINASC <- as.factor(mort_infantil_18$GESTACAO_SINASC)
 mort_infantil_18$PARTO_SINASC <- as.factor(mort_infantil_18$PARTO_SINASC)
 mort_infantil_18$APGAR1_SINASC <- as.factor(mort_infantil_18$APGAR1_SINASC)
@@ -449,7 +480,7 @@ pred_mort <- function(bancoTreino, bancoPred){
       #"xgbTree" = eXtreme Gradient Boosting, "gbm" = Stochastic Gradient Boosting, "adaboost" = AdaBoost Classification Trees.
       
       # "glm", "ranger", "knn", "gbm", "nnet", "adaboost", "xgbTree", "dnn"
-      modelos <- c("knn")
+      modelos <- c("glm")
       
       i <- 1 #indice para atualizar o while
       index <- 1 #indice que retorna o modelo da lista
@@ -554,6 +585,7 @@ pred_mort <- function(bancoTreino, bancoPred){
 
 ```{r}
 modelo <- pred_mort(sinasc, mort_infantil_18)
+modelo
 ```
 
 
@@ -593,7 +625,3 @@ pred <- function(model, teste){
 pred(modelo, mort_infantil_18_test)
 
 ```
-
-
-
-
